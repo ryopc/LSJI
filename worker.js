@@ -2,8 +2,8 @@ var worker_default = {
   // 1. 定時実行 (Cron)：8分ごとに修行
   async scheduled(event, env, ctx) {
     const randomPattern = Math.floor(Math.random() * 4);
-    // 8分間隔に合わせてURLを叩く
     const fakeRequest = new Request(`https://local/train?pattern=${randomPattern}`);
+    // worker_defaultを直接参照してfetchを呼び出す
     await worker_default.fetch(fakeRequest, env);
   },
 
@@ -20,7 +20,7 @@ var worker_default = {
       return new Response(null, { headers: jsonHeader });
     }
 
-    // 1. 設定確認
+    // 1. 設定確認 (DB接続確認)
     const config = await env.DB.prepare("SELECT value FROM settings WHERE key = 'is_active'").first();
     const isActive = config ? config.value === 1 : true;
 
@@ -67,7 +67,6 @@ var worker_default = {
     // 4. 修行モード (/train)
     if (pathname === "/train") {
       const pattern = parseInt(searchParams.get("pattern") || "0");
-      // 8分間隔(1日180回)なので、1回200戦だと1日3.6万戦。ちょうど良い負荷です。
       const batchSize = 200; 
       const { results: q_rows } = await env.DB.prepare("SELECT * FROM q_table").all();
       
@@ -109,7 +108,6 @@ var worker_default = {
         prevStateB = hand_b;
       }
 
-      // Qテーブルを一括更新
       for (const key in q_map) {
         const [s, a] = key.split("-").map(Number);
         statements.push(env.DB.prepare("UPDATE q_table SET q_value = ? WHERE state = ? AND action = ?").bind(q_map[key], s, a));
@@ -119,25 +117,34 @@ var worker_default = {
       return new Response(JSON.stringify({ status: "success", pattern, today_total: todayCount + batchSize }), { headers: jsonHeader });
     }
 
-      // 5. 対戦モード (/play)
+    // 5. 対戦モード (/play)
     if (pathname === "/play") {
-      const userHand = parseInt(searchParams.get("hand") ?? "0");
+      // ユーザーの手の取得 (URLパラメータを柔軟に判定)
+      let handParam = searchParams.get("hand") || searchParams.get("h");
+      if (!handParam) {
+        const rawQuery = request.url.split('?')[1];
+        if (rawQuery && /^[0-2]$/.test(rawQuery)) {
+          handParam = rawQuery;
+        }
+      }
+      const userHand = parseInt(handParam ?? "0");
+
+      // AIの状態把握と意思決定
       const last = await env.DB.prepare("SELECT hand_a FROM battle_history WHERE mode='test' ORDER BY id DESC LIMIT 1").first();
       const state = last ? last.hand_a : 0;
 
-      // --- 修正箇所：探索（ランダム性）の導入 ---
       let aiHand;
-      if (Math.random() < 0.1) { // 10%の確率で完全にランダム
+      if (Math.random() < 0.1) { // 10%の確率でランダム（探索）
         aiHand = Math.floor(Math.random() * 3);
       } else {
         const row = await env.DB.prepare("SELECT action FROM q_table WHERE state = ? ORDER BY q_value DESC, RANDOM() LIMIT 1").bind(state).first();
         aiHand = row ? row.action : 0;
       }
-      // --- 修正ここまで ---
 
       const judge = (aiHand - userHand + 3) % 3;
       const reward = judge === 2 ? 1 : judge === 1 ? -1 : 0;
 
+      // DB更新
       await env.DB.batch([
         env.DB.prepare("UPDATE q_table SET q_value = q_value + 0.1 * (? - q_value) WHERE state = ? AND action = ?").bind(reward, state, aiHand),
         env.DB.prepare("INSERT INTO battle_history (mode, hand_a, hand_b, reward) VALUES ('test', ?, ?, ?)").bind(aiHand, userHand, reward)
@@ -151,6 +158,8 @@ var worker_default = {
         result: reward > 0 ? "AI_WIN" : reward < 0 ? "USER_WIN" : "DRAW"
       }), { headers: jsonHeader });
     }
+
+    return new Response(JSON.stringify({ status: "ready" }), { headers: jsonHeader });
   }
 };
 
