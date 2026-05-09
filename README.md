@@ -1,4 +1,4 @@
-LSJI README
+LSJI README [![DOI](https://zenodo.org/badge/1215735337.svg)](https://doi.org/10.5281/zenodo.20091736)
 =====
 ## What is LSJI?
 A rock-paper-scissors AI developed by ryopc that performs reinforcement learning automatically
