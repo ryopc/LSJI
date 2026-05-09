@@ -151,7 +151,6 @@ var worker_default = {
         result: reward > 0 ? "AI_WIN" : reward < 0 ? "USER_WIN" : "DRAW"
       }), { headers: jsonHeader });
     }
-    }
   }
 };
 
