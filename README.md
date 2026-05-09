@@ -3,7 +3,7 @@ LSJI README [![DOI](https://zenodo.org/badge/1215735337.svg)](https://doi.org/10
 ## What is LSJI?
 A rock-paper-scissors AI developed by ryopc that performs reinforcement learning automatically
 ## How to Use
-curl https://lsji.ryopc.qzz.io/play?=Hand
+curl https://lsji.ryopc.qzz.io/play?hand=Hand
 ### Hand Gestures
 0. Rock
 1. Scissors
