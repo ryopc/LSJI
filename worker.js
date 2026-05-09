@@ -119,14 +119,21 @@ var worker_default = {
       return new Response(JSON.stringify({ status: "success", pattern, today_total: todayCount + batchSize }), { headers: jsonHeader });
     }
 
-    // 5. 対戦モード (/play)
+      // 5. 対戦モード (/play)
     if (pathname === "/play") {
       const userHand = parseInt(searchParams.get("hand") ?? "0");
       const last = await env.DB.prepare("SELECT hand_a FROM battle_history WHERE mode='test' ORDER BY id DESC LIMIT 1").first();
       const state = last ? last.hand_a : 0;
 
-      const row = await env.DB.prepare("SELECT action FROM q_table WHERE state = ? ORDER BY q_value DESC, RANDOM() LIMIT 1").bind(state).first();
-      const aiHand = row ? row.action : 0;
+      // --- 修正箇所：探索（ランダム性）の導入 ---
+      let aiHand;
+      if (Math.random() < 0.1) { // 10%の確率で完全にランダム
+        aiHand = Math.floor(Math.random() * 3);
+      } else {
+        const row = await env.DB.prepare("SELECT action FROM q_table WHERE state = ? ORDER BY q_value DESC, RANDOM() LIMIT 1").bind(state).first();
+        aiHand = row ? row.action : 0;
+      }
+      // --- 修正ここまで ---
 
       const judge = (aiHand - userHand + 3) % 3;
       const reward = judge === 2 ? 1 : judge === 1 ? -1 : 0;
@@ -144,9 +151,3 @@ var worker_default = {
         result: reward > 0 ? "AI_WIN" : reward < 0 ? "USER_WIN" : "DRAW"
       }), { headers: jsonHeader });
     }
-
-    return new Response(JSON.stringify({ status: "ready" }), { headers: jsonHeader });
-  }
-};
-
-export { worker_default as default };
