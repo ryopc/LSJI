@@ -1,5 +1,8 @@
 LSJI README [![DOI](https://zenodo.org/badge/1215735337.svg)](https://doi.org/10.5281/zenodo.20091736)
 =====
+## Notice of Development Cancellation
+We have decided to cancel this project due to its high credit consumption.
+
 ## What is LSJI?
 A rock-paper-scissors AI developed by ryopc that performs reinforcement learning automatically
 ## How to Use
